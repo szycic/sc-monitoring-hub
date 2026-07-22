@@ -1,3 +1,4 @@
+import gc
 import paramiko
 import io
 import json
@@ -83,6 +84,8 @@ def test_ssh_connection(host: str, port: int, username: str, auth_type: str, aut
         client = _get_ssh_client(dummy_device, timeout=5)
         stdin, stdout, stderr = client.exec_command("hostname; uname -sr")
         out = stdout.read().decode('utf-8').strip()
+        stdout.close()
+        stderr.close()
         client.close()
         return True, f"Connected successfully: {out}"
     except Exception as e:
@@ -128,6 +131,8 @@ def fetch_ssh_metrics(device: Dict[str, Any]) -> Dict[str, Any]:
     try:
         stdin, stdout, stderr = client.exec_command(py_cmd)
         out_str = stdout.read().decode('utf-8').strip()
+        stdout.close()
+        stderr.close()
     except Exception:
         close_ssh_connection(device.get("id", 0))
         raise
@@ -172,6 +177,8 @@ def fetch_ssh_processes(device: Dict[str, Any], search: str = "", limit: int = 1
     try:
         stdin, stdout, stderr = client.exec_command(ps_cmd)
         lines = stdout.read().decode('utf-8').strip().split('\n')
+        stdout.close()
+        stderr.close()
     except Exception:
         close_ssh_connection(device.get("id", 0))
         raise
@@ -233,6 +240,8 @@ def fetch_ssh_journal(device: Dict[str, Any], unit: str = "", priority: str = ""
     try:
         stdin, stdout, stderr = client.exec_command(cmd)
         out_str = stdout.read().decode('utf-8').strip()
+        stdout.close()
+        stderr.close()
     except Exception:
         close_ssh_connection(device.get("id", 0))
         raise
@@ -265,6 +274,8 @@ def kill_ssh_process(device: Dict[str, Any], pid: int, signal_num: int = 9) -> b
     try:
         client = _get_ssh_client(device)
         stdin, stdout, stderr = client.exec_command(f"kill -{signal_num} {pid}")
+        stdout.close()
+        stderr.close()
         return True
     except Exception:
         close_ssh_connection(device.get("id", 0))
@@ -297,6 +308,8 @@ def deploy_agent(device: Dict[str, Any]) -> Tuple[bool, str]:
         stdin, stdout, stderr = client.exec_command(install_cmd)
         exit_code = stdout.channel.recv_exit_status()
         out_msg = stdout.read().decode('utf-8') + stderr.read().decode('utf-8')
+        stdout.close()
+        stderr.close()
 
         if exit_code != 0:
             user_cmd = (
@@ -309,7 +322,10 @@ def deploy_agent(device: Dict[str, Any]) -> Tuple[bool, str]:
             stdin, stdout, stderr = client.exec_command(user_cmd)
             stdout.channel.recv_exit_status()
             out_msg = "Agent started in user background process (~/.local/share/sc-agent)"
+            stdout.close()
+            stderr.close()
 
+        gc.collect()
         return True, f"Agent v{AGENT_VERSION} deployed: {out_msg.strip()}"
     except Exception as e:
         close_ssh_connection(device.get("id", 0))
@@ -319,6 +335,8 @@ def _exec_ssh_step(client: paramiko.SSHClient, cmd: str):
     try:
         stdin, stdout, stderr = client.exec_command(cmd)
         stdout.channel.recv_exit_status()
+        stdout.close()
+        stderr.close()
     except Exception:
         pass
 
@@ -326,7 +344,6 @@ def uninstall_agent(device: Dict[str, Any]) -> Tuple[bool, str]:
     try:
         client = _get_ssh_client(device, timeout=10)
         
-        # Run discrete SSH steps to guarantee deletion even if systemctl stop returns non-zero
         _exec_ssh_step(client, "sudo systemctl stop sc-monitoring-agent")
         _exec_ssh_step(client, "sudo systemctl disable sc-monitoring-agent")
         _exec_ssh_step(client, "sudo pkill -9 -f sc_agent.py; pkill -9 -f sc_agent.py")
@@ -337,6 +354,7 @@ def uninstall_agent(device: Dict[str, Any]) -> Tuple[bool, str]:
         _exec_ssh_step(client, "sudo systemctl daemon-reload")
         _exec_ssh_step(client, "sudo systemctl reset-failed")
 
+        gc.collect()
         return True, "Agent stopped and uninstalled"
     except Exception as e:
         close_ssh_connection(device.get("id", 0))

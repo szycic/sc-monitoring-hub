@@ -1,22 +1,23 @@
 import hashlib
 
-AGENT_VERSION = "1.0.2"
+AGENT_VERSION = "1.0.3"
 
 AGENT_PYTHON_SCRIPT = '''#!/usr/bin/env python3
 """
 SC Monitoring Agent
-Standalone lightweight agent for sc-monitoring-hub
+Standalone lightweight agent for sc-monitoring-hub (RAM Optimized)
 """
 import os
 import sys
 import time
 import json
+import gc
 import platform
 import subprocess
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import parse_qs, urlparse
 
-AGENT_VERSION = "1.0.2"
+AGENT_VERSION = "1.0.3"
 
 try:
     import psutil
@@ -106,7 +107,9 @@ def get_processes(search="", limit=100, sort_by="cpu_percent"):
     if sort_by in ["pid", "name"]:
         reverse = False
     procs.sort(key=lambda x: x.get(sort_by, 0), reverse=reverse)
-    return procs[:limit]
+    res = procs[:limit]
+    gc.collect()
+    return res
 
 def get_journal(unit="", priority="", lines=100, search=""):
     cmd = ["journalctl", "-n", str(lines), "-o", "json"]
@@ -140,6 +143,7 @@ def get_journal(unit="", priority="", lines=100, search=""):
                 })
             except Exception:
                 continue
+        gc.collect()
         return logs
     except Exception:
         return []

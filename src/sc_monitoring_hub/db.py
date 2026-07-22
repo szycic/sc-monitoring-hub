@@ -9,10 +9,13 @@ from sc_monitoring_hub.config import DB_PATH
 def get_db():
     conn = sqlite3.connect(DB_PATH, check_same_thread=False)
     conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA journal_mode = WAL;")
+    conn.execute("PRAGMA synchronous = NORMAL;")
     return conn
 
 def init_db():
-    with get_db() as conn:
+    conn = get_db()
+    try:
         cursor = conn.cursor()
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS systems (
@@ -56,7 +59,6 @@ def init_db():
         )
         """)
 
-        # Auto-seed Local Host if no systems exist
         cursor.execute("SELECT COUNT(*) FROM systems WHERE is_local = 1")
         if cursor.fetchone()[0] == 0:
             hostname = socket.gethostname()
@@ -65,20 +67,28 @@ def init_db():
                 VALUES (?, '127.0.0.1', 0, 'local', 1, 'local', 'online', ?)
             """, (f"Local Host ({hostname})", time.time()))
         conn.commit()
+    finally:
+        conn.close()
 
 def list_systems() -> List[Dict[str, Any]]:
-    with get_db() as conn:
+    conn = get_db()
+    try:
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM systems ORDER BY is_local DESC, id ASC")
         rows = cursor.fetchall()
         return [dict(row) for row in rows]
+    finally:
+        conn.close()
 
 def get_system(system_id: int) -> Optional[Dict[str, Any]]:
-    with get_db() as conn:
+    conn = get_db()
+    try:
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM systems WHERE id = ?", (system_id,))
         row = cursor.fetchone()
         return dict(row) if row else None
+    finally:
+        conn.close()
 
 def add_system(
     name: str,
@@ -90,7 +100,8 @@ def add_system(
     mode: str = "agentless",
     agent_port: int = 9990
 ) -> int:
-    with get_db() as conn:
+    conn = get_db()
+    try:
         cursor = conn.cursor()
         cursor.execute("""
             INSERT INTO systems (name, host, port, username, auth_type, auth_credential, is_local, mode, agent_port, status, created_at)
@@ -98,9 +109,12 @@ def add_system(
         """, (name, host, port, username, auth_type, auth_credential, mode, agent_port, time.time()))
         conn.commit()
         return cursor.lastrowid
+    finally:
+        conn.close()
 
 def update_system_status(system_id: int, status: str, message: str = ""):
-    with get_db() as conn:
+    conn = get_db()
+    try:
         cursor = conn.cursor()
         cursor.execute("""
             UPDATE systems
@@ -108,21 +122,30 @@ def update_system_status(system_id: int, status: str, message: str = ""):
             WHERE id = ?
         """, (status, message, time.time(), system_id))
         conn.commit()
+    finally:
+        conn.close()
 
 def update_system_mode(system_id: int, mode: str):
-    with get_db() as conn:
+    conn = get_db()
+    try:
         cursor = conn.cursor()
         cursor.execute("UPDATE systems SET mode = ? WHERE id = ?", (mode, system_id))
         conn.commit()
+    finally:
+        conn.close()
 
 def delete_system(system_id: int):
-    with get_db() as conn:
+    conn = get_db()
+    try:
         cursor = conn.cursor()
         cursor.execute("DELETE FROM systems WHERE id = ? AND is_local = 0", (system_id,))
         conn.commit()
+    finally:
+        conn.close()
 
 def save_metrics(system_id: int, metrics: Dict[str, Any]):
-    with get_db() as conn:
+    conn = get_db()
+    try:
         cursor = conn.cursor()
         now = time.time()
         load_avg_str = json.dumps(metrics.get("load_avg", []))
@@ -148,11 +171,20 @@ def save_metrics(system_id: int, metrics: Dict[str, Any]):
             load_avg_str,
             json.dumps(metrics)
         ))
-        cursor.execute("DELETE FROM metrics_history WHERE timestamp < ?", (now - 86400,))
+        # Keep last 500 records per system to keep database lightweight
+        cursor.execute("""
+            DELETE FROM metrics_history
+            WHERE system_id = ? AND id NOT IN (
+                SELECT id FROM metrics_history WHERE system_id = ? ORDER BY id DESC LIMIT 500
+            )
+        """, (system_id, system_id))
         conn.commit()
+    finally:
+        conn.close()
 
 def get_latest_metrics(system_id: int) -> Optional[Dict[str, Any]]:
-    with get_db() as conn:
+    conn = get_db()
+    try:
         cursor = conn.cursor()
         cursor.execute("""
             SELECT raw_json FROM metrics_history
@@ -163,9 +195,12 @@ def get_latest_metrics(system_id: int) -> Optional[Dict[str, Any]]:
         if row and row["raw_json"]:
             return json.loads(row["raw_json"])
         return None
+    finally:
+        conn.close()
 
 def get_metrics_history(system_id: int, limit: int = 30) -> List[Dict[str, Any]]:
-    with get_db() as conn:
+    conn = get_db()
+    try:
         cursor = conn.cursor()
         cursor.execute("""
             SELECT timestamp, cpu_percent, memory_percent, disk_percent, swap_percent, net_bytes_sent, net_bytes_recv
@@ -175,3 +210,5 @@ def get_metrics_history(system_id: int, limit: int = 30) -> List[Dict[str, Any]]
         """, (system_id, limit))
         rows = cursor.fetchall()
         return [dict(row) for row in reversed(rows)]
+    finally:
+        conn.close()

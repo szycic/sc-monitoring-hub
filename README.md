@@ -23,9 +23,9 @@ The following environment variables can be set to configure the application:
 | Variable | Purpose | Default |
 |---|---|---|
 | `DB_PATH` | Path to the SQLite database file | `./data/hub.db` |
+| `POLL_INTERVAL_SECONDS` | Interval in seconds for background metric polling | `3.0` |
 | `HOST` | Bind host address for the FastAPI server | `0.0.0.0` |
 | `PORT` | Bind port for the FastAPI server | `8000` |
-| `POLL_INTERVAL_SECONDS` | Interval in seconds for background metric polling | `3.0` |
 
 ## Installation
 

@@ -467,6 +467,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function handleAddSystemSubmit(e) {
         e.preventDefault();
+        const btnSave = document.getElementById('btn-save-system');
+        const origText = btnSave ? btnSave.textContent : 'Save & Add System';
+        if (btnSave) {
+            btnSave.disabled = true;
+            btnSave.textContent = 'Adding System...';
+        }
+
         const payload = {
             name: document.getElementById('system-name').value,
             host: document.getElementById('system-host').value,
@@ -486,6 +493,8 @@ document.addEventListener('DOMContentLoaded', () => {
             if (res.ok) {
                 document.getElementById('add-system-modal').classList.remove('active');
                 document.getElementById('add-system-form').reset();
+                const output = document.getElementById('modal-terminal-output');
+                if (output) output.style.display = 'none';
                 loadSystems();
             } else {
                 const errData = await res.json();
@@ -493,6 +502,11 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } catch (err) {
             alert('Failed to add system: ' + err);
+        } finally {
+            if (btnSave) {
+                btnSave.disabled = false;
+                btnSave.textContent = origText;
+            }
         }
     }
 

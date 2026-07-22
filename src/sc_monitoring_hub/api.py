@@ -52,8 +52,8 @@ async def api_add_system(payload: SystemCreateSchema):
     )
     sys_node = db.get_system(sys_id)
     if payload.mode == "agent" and sys_node:
-        await asyncio.to_thread(ssh_manager.deploy_agent, sys_node)
-    return db.get_system(sys_id)
+        asyncio.create_task(asyncio.to_thread(ssh_manager.deploy_agent, sys_node))
+    return sys_node
 
 @api_v1_router.delete("/systems/{system_id}")
 async def api_delete_system(system_id: int):

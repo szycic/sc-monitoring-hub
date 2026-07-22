@@ -101,7 +101,16 @@ def fetch_ssh_metrics(device: Dict[str, Any]) -> Dict[str, Any]:
                 if resp.status == 200:
                     data = json.loads(resp.read().decode('utf-8'))
                     if data.get("agent_version") != AGENT_VERSION:
-                        deploy_agent(device)
+                        # Auto-update outdated agent on remote target
+                        success, _ = deploy_agent(device)
+                        if success:
+                            time.sleep(1)
+                            try:
+                                with urllib.request.urlopen(req, timeout=3) as new_resp:
+                                    if new_resp.status == 200:
+                                        return json.loads(new_resp.read().decode('utf-8'))
+                            except Exception:
+                                pass
                     return data
         except Exception:
             pass

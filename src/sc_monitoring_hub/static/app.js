@@ -377,7 +377,8 @@ document.addEventListener('DOMContentLoaded', () => {
             card.style.alignItems = 'stretch';
             
             const modeBadge = sys.is_local ? 'Local System' : (sys.mode === 'agent' ? 'Dedicated Agent' : 'Agentless SSH');
-            const agentVerBadge = sys.mode === 'agent' ? '<span style="margin-left: 8px; font-size: 0.75rem; background: rgba(6, 182, 212, 0.15); color: var(--accent-cyan); padding: 2px 6px; border-radius: 4px; font-weight: 600;">v1.0.2</span>' : '';
+            const ver = sys.agent_version ? `v${sys.agent_version}` : '';
+            const agentVerBadge = (sys.mode === 'agent' && ver) ? `<span style="margin-left: 8px; font-size: 0.75rem; background: rgba(6, 182, 212, 0.15); color: var(--accent-cyan); padding: 2px 6px; border-radius: 4px; font-weight: 600;">${ver}</span>` : '';
             
             card.innerHTML = `
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">

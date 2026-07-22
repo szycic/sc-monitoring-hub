@@ -6,6 +6,7 @@ from pydantic import BaseModel
 from sc_monitoring_hub import db
 from sc_monitoring_hub import local_collector
 from sc_monitoring_hub import ssh_manager
+from sc_monitoring_hub import agent_template
 
 api_v1_router = APIRouter(prefix="/api/v1")
 
@@ -36,7 +37,18 @@ class ProcessKillSchema(BaseModel):
 
 @api_v1_router.get("/systems")
 async def api_list_systems():
-    return db.list_systems()
+    systems = db.list_systems()
+    result = []
+    for sys_node in systems:
+        sys_dict = dict(sys_node)
+        if sys_dict.get("mode") == "agent":
+            latest = db.get_latest_metrics(sys_dict["id"])
+            if latest and "agent_version" in latest:
+                sys_dict["agent_version"] = latest["agent_version"]
+            else:
+                sys_dict["agent_version"] = agent_template.AGENT_VERSION
+        result.append(sys_dict)
+    return result
 
 @api_v1_router.post("/systems")
 async def api_add_system(payload: SystemCreateSchema):

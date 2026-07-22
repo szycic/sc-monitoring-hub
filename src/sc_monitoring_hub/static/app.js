@@ -120,10 +120,18 @@ document.addEventListener('DOMContentLoaded', () => {
             currentSystemId = parseInt(e.target.value);
             connectWebSocket();
             fetchCurrentSystemMetrics();
+
+            if (currentTabId === 'tab-htop') loadHtop();
+            if (currentTabId === 'tab-journal') loadJournal();
+            if (currentTabId === 'tab-systems') renderSystemsTab();
         });
 
         document.getElementById('btn-refresh').addEventListener('click', () => {
             fetchCurrentSystemMetrics();
+
+            if (currentTabId === 'tab-htop') loadHtop();
+            if (currentTabId === 'tab-journal') loadJournal();
+            if (currentTabId === 'tab-systems') renderSystemsTab();
         });
 
         // HTOP events
